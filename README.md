@@ -20,13 +20,13 @@ No credentials are stored in this repo. The skill reads an API key from an envir
 Personal (all your projects):
 
 ```bash
-git clone <this-repo-url> ~/.claude/skills/arvancloud-api
+git clone https://github.com/erfnzdeh/arvancloud-api-skill.git ~/.claude/skills/arvancloud-api
 ```
 
 Project-specific (travels with a single repo):
 
 ```bash
-git clone <this-repo-url> .claude/skills/arvancloud-api
+git clone https://github.com/erfnzdeh/arvancloud-api-skill.git .claude/skills/arvancloud-api
 ```
 
 ### Cursor
