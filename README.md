@@ -35,4 +35,4 @@ Cursor loads persistent instructions from `.cursor/rules/` rather than `SKILL.md
 
 ## License
 
-MIT — see `LICENSE`.
+MIT — see [LICENSE](LICENSE).
