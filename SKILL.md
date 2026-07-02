@@ -21,13 +21,22 @@ Every product except Object Storage authenticates with a **machine-user API key*
 Authorization: apikey <your-uuid>
 ```
 
-Read it from the environment so it isn't committed anywhere:
+**`ARVAN_KEY` is just the default name — don't assume it's actually called that.** Resolve the real env var name in this order, every session:
+
+1. If `~/.config/arvan/config.json` exists, read `apiKeyEnv` from it (see §2) — that's the confirmed name from a previous conversation. Check that the named var is actually set (`printenv "$(jq -r .apiKeyEnv ~/.config/arvan/config.json)"`).
+2. If there's no config yet, or the named var is unset/empty, fall back to checking `$ARVAN_KEY` as a guess.
+3. If that's also unset, **stop and ask the user** which environment variable holds their ArvanCloud API key (or have them export one now, e.g. in this shell or their profile). Don't invent, hardcode, or silently fall back to a wrong name — a missing key should be a question, not a guess.
+4. Once you have a confirmed, working var name, **write it back** to `apiKeyEnv` in `~/.config/arvan/config.json` (creating the file from the template first if needed — see §2) so future conversations resolve it automatically without asking again:
+
+   ```bash
+   tmp=$(mktemp) && jq --arg v "$CONFIRMED_VAR_NAME" '.apiKeyEnv = $v' ~/.config/arvan/config.json > "$tmp" && mv "$tmp" ~/.config/arvan/config.json
+   ```
 
 ```bash
-export ARVAN_KEY="apikey XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+export ARVAN_KEY="apikey XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"   # example only — the real var may be named differently
 ```
 
-Then use `-H "Authorization: $ARVAN_KEY"` in every request. If `$ARVAN_KEY` is unset, ask the user to export it (or add it to their shell profile / a `.env` they source) before running any live call. A wrong, missing, or under-permissioned key returns `{"message": "Unauthenticated."}`.
+Then use `-H "Authorization: ${!CONFIRMED_VAR_NAME}"` (i.e. the value of whichever var name you resolved) in every request. A wrong, missing, or under-permissioned key returns `{"message": "Unauthenticated."}` — if you see that with a var that's set, don't assume the name is wrong; ask the user to check the key's value/permissions instead.
 
 **Creating a key:** npanel → Settings → IAM → Machine users → Create machine user. The key is shown **once** as `apikey XXXX-…` (stored hashed afterward, unrecoverable). Assign IAM access rules per product the key should touch. To check resources across multiple ArvanCloud accounts you need a separate key per account — each key only sees its own account. Docs: https://docs.arvancloud.ir/fa/developer-tools/api/api-key. Revoke a leaked key at https://npanel.arvancloud.ir/profile/iam/machine-users.
 
@@ -48,7 +57,7 @@ jq -r '.deployHooks["example.ir"]' ~/.config/arvan/config.json # cert-deploy tar
 ```
 
 Schema (see `assets/config.example.json` for a filled-out placeholder):
-- `apiKeyEnv` — name of the env var holding the key (default `ARVAN_KEY`); lets you resolve the key without hardcoding it.
+- `apiKeyEnv` — name of the env var holding the key. Defaults to `ARVAN_KEY` only as an initial guess; once the agent has confirmed the real name with the user (see §1), it overwrites this field so future conversations don't have to ask again.
 - `acmeTokenEnv` — env var acme.sh's `dns_arvan` plugin reads (default `Arvan_Token`).
 - `defaultRegion` — IaaS region to use when the user doesn't specify one.
 - `deployHooks` — map of `domain → { sshHost, certDirs[], reloadCmd }`, used to wire `acme.sh --install-cert` after cert renewal (see `references/dns-and-tls.md`).
@@ -145,3 +154,4 @@ curl -s -H "Authorization: $ARVAN_KEY" "https://napi.arvancloud.ir/vod/2.0/chann
 - A domain can show `status: active` in the panel yet **not actually be published** by Arvan's authoritative nameservers. Always confirm real resolution (`dig SOA <domain> @8.8.8.8`) before attempting DNS-01 cert issuance.
 - Iran's DNS filtering returns forged IPs `10.10.34.34/.35/.36` — **not** empty responses. An empty SOA/NS/A means a delegation/publishing problem, not censorship.
 - Fetch OpenAPI specs from `/api-docs/…`; don't scrape the ReDoc HTML pages (they time out).
+- Don't assume the API key lives in `$ARVAN_KEY`. Check `apiKeyEnv` in the config first, ask the user if it's still unresolved, and persist the confirmed name back to the config — see "Credentials" above.
