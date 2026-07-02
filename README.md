@@ -1,4 +1,4 @@
-# arvancloud-api (Agent Skill)
+# ArvanCloud's API Agent Skill
 
 Unofficial, community-maintained [Agent Skill](https://code.claude.com/docs/en/skills) for driving [ArvanCloud](https://arvancloud.ir)'s APIs (CDN, DNS, Cloud Server / IaaS, Object Storage, Edge Computing, Cloud Container, VOD/Live/Video Ads) and issuing Let's Encrypt wildcard TLS certs via acme.sh's `dns_arvan` plugin — from Claude Code, Cursor, or any agent that supports the `SKILL.md` format.
 
@@ -20,13 +20,13 @@ No credentials are stored in this repo. The skill reads an API key from an envir
 Personal (all your projects):
 
 ```bash
-git clone https://github.com/erfnzdeh/arvancloud-api-skill.git ~/.claude/skills/arvancloud-api
+git clone https://github.com/erfnzdeh/arvancloud-agent-skill.git ~/.claude/skills/arvancloud-api
 ```
 
 Project-specific (travels with a single repo):
 
 ```bash
-git clone https://github.com/erfnzdeh/arvancloud-api-skill.git .claude/skills/arvancloud-api
+git clone https://github.com/erfnzdeh/arvancloud-agent-skill.git .claude/skills/arvancloud-api
 ```
 
 ### Cursor
