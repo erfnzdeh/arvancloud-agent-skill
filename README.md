@@ -1,5 +1,7 @@
 # ArvanCloud's API Agent Skill
 
+![license](https://img.shields.io/github/license/erfnzdeh/arvancloud-agent-skill) ![type](https://img.shields.io/badge/type-Agent_Skill-blueviolet) ![works with](https://img.shields.io/badge/works_with-Claude_Code-D97757?logo=claude&logoColor=white) ![status](https://img.shields.io/badge/status-unofficial-orange)
+
 Unofficial, community-maintained [Agent Skill](https://code.claude.com/docs/en/skills) for driving [ArvanCloud](https://arvancloud.ir)'s APIs (CDN, DNS, Cloud Server / IaaS, Object Storage, Edge Computing, Cloud Container, VOD/Live/Video Ads) and issuing Let's Encrypt wildcard TLS certs via acme.sh's `dns_arvan` plugin — from Claude Code, Cursor, or any agent that supports the `SKILL.md` format.
 
 Not affiliated with or endorsed by ArvanCloud.
