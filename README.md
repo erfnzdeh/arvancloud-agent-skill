@@ -35,6 +35,12 @@ git clone https://github.com/erfnzdeh/arvancloud-agent-skill.git .claude/skills/
 
 Cursor loads persistent instructions from `.cursor/rules/` rather than `SKILL.md`. To use this skill in Cursor, convert it into a rule (e.g. copy `SKILL.md`'s body into a `.cursor/rules/arvancloud-api.mdc` file) or reference this repo's `SKILL.md` directly from a rule.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Endpoint corrections and gotchas
+go in [issues](https://github.com/erfnzdeh/arvancloud-agent-skill/issues).
+Security reports are private: see [SECURITY.md](SECURITY.md).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

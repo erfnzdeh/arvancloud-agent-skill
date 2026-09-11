@@ -1,0 +1,44 @@
+name: Bug report
+description: A wrong host, header, path, or cert step
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A leaked key or a prompt that writes one into the skill is not an issue.
+        Use a [private advisory](https://github.com/erfnzdeh/arvancloud-agent-skill/security/advisories/new).
+        Redact `Authorization` headers.
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - SKILL.md (auth, product map)
+        - DNS / TLS / acme.sh
+        - Cloud Server / IaaS
+        - Object Storage
+        - CDN or another product
+        - Docs / install
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      placeholder: The skill sent Apikey to the S3 endpoint. dns_arvan looked for the wrong env var. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to see it
+      description: The curl or the skill step. No live keys. If an endpoint moved, paste the spec URL you checked.
+    validations:
+      required: true

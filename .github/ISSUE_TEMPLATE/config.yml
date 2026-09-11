@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security report
+    url: https://github.com/erfnzdeh/arvancloud-agent-skill/security/advisories/new
+    about: A prompt that leaks a key, or auth that sends one to the wrong host. Private, not an issue.
+  - name: ArvanCloud API docs
+    url: https://docs.arvancloud.ir/
+    about: The live specs are the source of truth. Check them before filing "this path 404s".

@@ -1,0 +1,27 @@
+name: Feature request
+description: Another product surface, or a gotcha the skill should warn about
+labels: [enhancement]
+body:
+  - type: textarea
+    id: want
+    attributes:
+      label: What you want
+      placeholder: Edge Computing deploy steps. A note about region X. …
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What an agent gets wrong today without this. Link the OpenAPI spec if you have it.
+    validations:
+      required: true
+  - type: dropdown
+    id: spec
+    attributes:
+      label: Did you check the live ArvanCloud spec?
+      options:
+        - Yes, and I can link it
+        - No / not sure
+    validations:
+      required: true
