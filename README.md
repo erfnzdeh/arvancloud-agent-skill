@@ -19,6 +19,12 @@ Primary (Claude Code, Cursor, Codex, and 60+ other agents):
 npx skills add erfnzdeh/arvancloud-agent-skill
 ```
 
+### npm / skillpm
+
+```bash
+npx skillpm install arvancloud-api-skill
+```
+
 ### Claude Code plugin
 
 ```text
