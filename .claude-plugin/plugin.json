@@ -1,0 +1,21 @@
+{
+  "name": "arvancloud-api",
+  "version": "1.0.0",
+  "description": "Unofficial Agent Skill for ArvanCloud APIs (CDN, DNS, IaaS, Object Storage, Edge, CaaS, VOD/Live) and Let's Encrypt DNS-01 via acme.sh dns_arvan.",
+  "author": {
+    "name": "erfnzdeh",
+    "email": "erfnzdeh@gmail.com"
+  },
+  "homepage": "https://github.com/erfnzdeh/arvancloud-agent-skill",
+  "repository": "https://github.com/erfnzdeh/arvancloud-agent-skill",
+  "license": "MIT",
+  "keywords": [
+    "arvancloud",
+    "dns",
+    "cdn",
+    "iaas",
+    "object-storage",
+    "lets-encrypt",
+    "acme-sh"
+  ]
+}

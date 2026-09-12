@@ -1,0 +1,29 @@
+{
+  "name": "arvancloud-api-skill",
+  "version": "1.0.0",
+  "description": "Unofficial Agent Skill for ArvanCloud APIs and Let's Encrypt DNS-01 via acme.sh dns_arvan.",
+  "keywords": [
+    "agent-skill",
+    "arvancloud",
+    "claude-code",
+    "cursor",
+    "dns",
+    "lets-encrypt",
+    "acme-sh"
+  ],
+  "license": "MIT",
+  "author": "erfnzdeh <erfnzdeh@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/erfnzdeh/arvancloud-agent-skill.git"
+  },
+  "homepage": "https://github.com/erfnzdeh/arvancloud-agent-skill",
+  "bugs": {
+    "url": "https://github.com/erfnzdeh/arvancloud-agent-skill/issues"
+  },
+  "files": [
+    "skills",
+    "README.md",
+    "LICENSE"
+  ]
+}

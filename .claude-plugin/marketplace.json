@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "arvancloud-agent-skill",
+  "owner": {
+    "name": "erfnzdeh",
+    "email": "erfnzdeh@gmail.com"
+  },
+  "metadata": {
+    "description": "Unofficial ArvanCloud API skill for Claude Code, Cursor, and other SKILL.md agents.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "arvancloud-api",
+      "source": "./",
+      "description": "Operate ArvanCloud APIs, DNS records, Cloud Server/IaaS, Object Storage, VOD/Live, CDN/Security, and Let's Encrypt DNS-01 certificates via acme.sh dns_arvan.",
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -26,10 +26,10 @@ There is no test suite. A change to an endpoint should include the
 ## Setup
 
 ```bash
-git clone https://github.com/erfnzdeh/arvancloud-agent-skill.git ~/.cursor/skills/arvancloud-api
+npx skills add erfnzdeh/arvancloud-agent-skill
 ```
 
-Or the Claude Code path in the README. You need an ArvanCloud machine-user
+Or clone the repo under `~/.cursor/skills/arvancloud-api` / `~/.claude/skills/arvancloud-api` as in the README. The skill lives in `skills/arvancloud-api/`. You need an ArvanCloud machine-user
 key in an environment variable to exercise anything. Do not put that key
 in a PR.
 

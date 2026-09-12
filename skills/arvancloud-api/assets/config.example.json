@@ -1,0 +1,27 @@
+{
+  "_comment": "Copy this to ~/.config/arvan/config.json and fill in your own values. NEVER put API keys or S3 secrets here — only the names of env vars that hold them. Domains are fetched live via GET /domains, so they are not listed here; only per-domain deploy hooks and notes live in this file.",
+  "apiKeyEnv": "ARVAN_KEY",
+  "acmeTokenEnv": "Arvan_Token",
+  "baseUrl": "https://napi.arvancloud.ir",
+  "timeoutSeconds": 60,
+  "maxRetries": 4,
+  "backoffFactor": 1.0,
+  "defaultRegion": "ir-thr-c2",
+  "s3AccessKeyEnv": "ARVAN_S3_ACCESS_KEY",
+  "s3SecretKeyEnv": "ARVAN_S3_SECRET_KEY",
+  "s3Region": "ir-thr-at1",
+  "s3Endpoint": "",
+  "deployHooks": {
+    "example.ir": {
+      "sshHost": "myserver",
+      "certDirs": [
+        "/etc/nginx/certs/example.ir/",
+        "/etc/nginx/certs/app.example.ir/"
+      ],
+      "reloadCmd": "sudo systemctl reload nginx"
+    }
+  },
+  "notes": {
+    "example.ir": "Freeform per-domain reminder, e.g. 'active in panel but not published on public DNS — DNS-01 impossible until the zone is published'."
+  }
+}
