@@ -1,7 +1,7 @@
 {
   "name": "arvancloud-api",
   "displayName": "ArvanCloud API",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Unofficial Agent Skill for ArvanCloud APIs (CDN, DNS, IaaS, Object Storage, Edge, CaaS, VOD/Live) and Let's Encrypt DNS-01 via acme.sh dns_arvan.",
   "author": {
     "name": "erfnzdeh",
