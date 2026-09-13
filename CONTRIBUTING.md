@@ -47,8 +47,12 @@ in a PR.
 |---|---|
 | `SKILL.md` | Frontmatter, product map, auth, the rules that bite. |
 | `references/dns-and-tls.md` | DNS CRUD and acme.sh `dns_arvan`. |
-| `references/iaas.md` | Cloud Server 3.0 vs legacy 1.0. |
-| `references/mcp-cross-check.md` | Notes against `arvancloud-mcp`. |
+| `references/iaas.md` | Cloud Server v3, v1 and undocumented v2; regions and AZs. |
+| `references/object-storage.md` | Object Storage management API and S3 endpoints. |
+| `references/products.md` | Edge Computing, Live, VOD, Video Ads, Cloud Container. |
+| `references/mcp-cross-check.md` | Corrections against `arvancloud-mcp`, the official CLI and older skill versions. |
+| `scripts/arvan-api.sh` | Request wrapper. Keep it bash 3.2 compatible and GET-only by default. |
+| `scripts/arvan-inventory.sh` | Read-only account snapshot. GET requests only. |
 | `assets/config.example.json` | Env *names* only. No values. |
 
 Contributions are under the same MIT license as the rest of the repo.
