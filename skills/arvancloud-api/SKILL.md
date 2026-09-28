@@ -1,187 +1,232 @@
 ---
 name: arvancloud-api
-description: Operate ArvanCloud APIs, DNS records, Cloud Server/IaaS, Object Storage, VOD/Live, CDN/Security, and Let's Encrypt DNS-01 certificates via acme.sh dns_arvan.
+description: Operate ArvanCloud (arvancloud.ir) through its REST APIs, including CDN and DNS records, domains, cache purge, WAF and rate limits, Cloud Server (IaaS v3, v1 and the undocumented v2 backups), Object Storage, Edge Computing, Cloud Container, VOD, Live and Video Ads, plus Let's Encrypt DNS-01 certificates via acme.sh dns_arvan. Use when the user wants to list, create, change or delete anything on ArvanCloud, take an account inventory, find out which account a key belongs to, check quota or usage, or debug an ArvanCloud API error. Also trigger on hosts like napi.arvancloud.ir, ecc.{region}.arvanapis.ir, storage.arvanapis.ir, dejban.arvancloud.ir, an "Apikey" Authorization header, the dns_arvan plugin, or one of the user's ArvanCloud-hosted domains.
 ---
 
 # ArvanCloud API
 
-Practical, tested reference for driving ArvanCloud's APIs from the command line or an agent. ArvanCloud is an Iranian cloud provider; its products each have their own base URL, spec, and (for Object Storage) auth scheme. This skill gets those details right so you don't guess.
+Tested reference for driving ArvanCloud's REST APIs from the command line or an agent. Each
+product has its own base URL and spec, Cloud Server has three API generations, and Object Storage
+has a second auth scheme. This skill gets those details right so you don't guess.
 
-> Unofficial, community-maintained skill. Not affiliated with or endorsed by ArvanCloud. Base URLs, spec paths, and endpoint counts reflect what was current when this was written — verify against the live OpenAPI specs, which are the source of truth.
+> Unofficial, community-maintained skill. Not affiliated with or endorsed by ArvanCloud. Hosts,
+> paths and response shapes were checked against the published OpenAPI specs and read-only live
+> calls on 2026-09-13. The live specs and API remain the source of truth.
 
 ## Setup
 
-Use this whenever the user wants to manage anything on ArvanCloud — listing, creating, updating or deleting DNS records, adding or inspecting domains, spinning up or listing cloud servers, checking quota or usage, working with buckets, or getting and renewing certificates. Trigger even when ArvanCloud is not named explicitly but the task involves hosts like `napi.arvancloud.ir`, `ecc.{region}.arvancloudapis.ir`, `storage.arvanapis.ir`, `docs.arvancloud.ir`, an `Apikey` authorization header, the `dns_arvan` DNS plugin, or one of the user's ArvanCloud-hosted domains.
+Keep three things separate: the **secret** (API key) lives in an environment variable,
+**per-user state** (default region, cert-deploy hooks, notes) lives in a config file outside the
+skill, and anything the API can tell you (domains, servers, regions) is **fetched live**.
 
-This skill keeps three things separate: the **secret** (API key) lives in an environment variable, **per-user state** (default region, per-domain cert-deploy hooks, notes) lives in a config file outside the skill, and anything the API can tell you (like the list of domains) is **fetched live** rather than stored. The skill itself stays general — nothing account-specific belongs in it.
+### 1. Credentials: environment variable, never a file in the skill
 
-### 1. Credentials → environment variable (never a file in the skill)
-
-Every product except Object Storage authenticates with a **machine-user API key**. Canonicalize the request header to a capital `Apikey` prefix plus a space and the UUID:
+Every product except the Object Storage S3 API authenticates with a **machine-user API key**:
 
 ```
-Authorization: Apikey <your-uuid>
+Authorization: Apikey <uuid>
 ```
 
-**`ARVAN_KEY` is just the default name — don't assume it's actually called that.** Resolve the real env var name in this order, every session:
+**`ARVAN_KEY` is only the default name. Don't assume that's what it's called.** Resolve the real env var every session:
 
-1. If `~/.config/arvan/config.json` exists, read `apiKeyEnv` from it (see §2) — that's the confirmed name from a previous conversation. Check that the named var is actually set (`printenv "$(jq -r .apiKeyEnv ~/.config/arvan/config.json)"`).
-2. If there's no config yet, or the named var is unset/empty, fall back to checking `$ARVAN_KEY` as a guess.
-3. If that's also unset, **stop and ask the user** which environment variable holds their ArvanCloud API key (or have them export one now, e.g. in this shell or their profile). Don't invent, hardcode, or silently fall back to a wrong name — a missing key should be a question, not a guess.
-4. Once you have a confirmed, working var name, **write it back** to `apiKeyEnv` in `~/.config/arvan/config.json` (creating the file from the template first if needed — see §2) so future conversations resolve it automatically without asking again:
+1. If `~/.config/arvan/config.json` exists, read `apiKeyEnv` from it and check that the named
+   var is set (`printenv "$(jq -r .apiKeyEnv ~/.config/arvan/config.json)" >/dev/null`).
+2. Otherwise, or if that var is empty, try `$ARVAN_KEY`.
+3. If that is also unset, **stop and ask the user** which variable holds the key (or have them
+   export one). A missing key is a question, not a guess.
+4. Once confirmed, write the name back so future sessions don't ask:
 
    ```bash
    tmp=$(mktemp) && jq --arg v "$CONFIRMED_VAR_NAME" '.apiKeyEnv = $v' ~/.config/arvan/config.json > "$tmp" && mv "$tmp" ~/.config/arvan/config.json
    ```
 
-```bash
-export ARVAN_KEY="Apikey XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"   # example only — the real var may be named differently
-```
-
-The env var may contain either the bare UUID or a copied `apikey ...` / `Apikey ...` value. Before requests, normalize it instead of assuming the env var is already header-ready:
+The var may hold a bare UUID or a copied `apikey ...` / `Apikey ...` value. The bundled scripts
+normalize it; for raw curl do the same:
 
 ```bash
-VAR_NAME="${CONFIRMED_VAR_NAME:-ARVAN_KEY}"
-RAW_KEY="${!VAR_NAME}"
+RAW_KEY="${!CONFIRMED_VAR_NAME}"
 TOKEN="${RAW_KEY#apikey }"; TOKEN="${TOKEN#Apikey }"
-AUTH_HEADER="Apikey $TOKEN"
-curl -s -H "Authorization: $AUTH_HEADER" "https://napi.arvancloud.ir/cdn/4.0/domains?per_page=100"
+curl -s -H "Authorization: Apikey $TOKEN" "https://napi.arvancloud.ir/cdn/4.0/domains?per_page=100"
 ```
 
-A wrong, missing, or under-permissioned key returns `{"message": "Unauthenticated."}` or a product-specific authorization error. If you see that with a var that's set, don't assume the name is wrong; ask the user to check the key's value/permissions instead.
+**One key sees one account.** Users often hold keys for several accounts. Before any write, run
+`GET https://dejban.arvancloud.ir/v1/me` and name the account (`data.account.name`) in the
+confirmation. Treat a `401` as a bad or revoked key and ask the user to check it. A `403` is covered in the errors table below.
 
-**Creating a key:** npanel → Settings → IAM → Machine users → Create machine user. The key is shown **once** as `Apikey XXXX-…` / `apikey XXXX-…` depending on the UI surface (stored hashed afterward, unrecoverable). Assign IAM access rules per product the key should touch. To check resources across multiple ArvanCloud accounts you need a separate key per account — each key only sees its own account. Docs: https://docs.arvancloud.ir/fa/developer-tools/api/api-key. Revoke a leaked key at https://npanel.arvancloud.ir/profile/iam/machine-users.
+**Creating a key:** panel, Settings, IAM, Machine users, Create machine user. The key is shown
+**once**. Assign IAM access rules per product. Docs:
+https://docs.arvancloud.ir/fa/developer-tools/api/api-key and
+https://docs.arvancloud.ir/en/accounts/iam/machine-user. Revoke leaked keys in the same panel page
+(`panel.arvancloud.ir`; the old `npanel.arvancloud.ir` host redirects there).
 
-### 2. Per-user state → `~/.config/arvan/config.json`
+### 2. Per-user state: `~/.config/arvan/config.json`
 
-Account-specific, slow-changing settings live in a JSON file at `~/.config/arvan/config.json` (XDG config dir — persists on the user's machine under Claude Code). The skill ships a placeholder template at `assets/config.example.json`. On first use, if the config doesn't exist yet, create it from the template:
+On first use, create it from the placeholder template:
 
 ```bash
 mkdir -p ~/.config/arvan
 [ -f ~/.config/arvan/config.json ] || cp "${CLAUDE_SKILL_DIR}/assets/config.example.json" ~/.config/arvan/config.json
 ```
 
-Read it whenever a task needs the user's defaults or deploy hooks (requires `jq`, or use Python):
+Schema (see `assets/config.example.json`):
+- `apiKeyEnv`: name of the env var holding the key (confirmed with the user, see above).
+- `acmeTokenEnv`: env var acme.sh's `dns_arvan` reads (default `Arvan_Token`).
+- `defaultRegion`: v3 region host to use when unspecified (`ir-central1`, `ir-northwest1`, `eu-west1`).
+- `defaultAz`: AZ code for v1/v2 paths and v3 create bodies (e.g. `ir-thr-fr1`).
+- `timeoutSeconds`, `maxRetries`, `backoffFactor`: used by `scripts/arvan-api.sh`. It retries only
+  `429`, and for GET also `5xx` and transient network errors (never DNS or TLS failures).
+- `s3AccessKeyEnv`, `s3SecretKeyEnv`, `s3Region`, `s3Endpoint`: Object Storage S3 settings. S3 uses
+  separate credentials, not the machine-user key.
+- `deployHooks`: `domain -> { sshHost, certDirs[], reloadCmd }` for `acme.sh --install-cert`.
+- `notes`: `domain -> freeform note` for per-domain quirks.
+
+The **secret never goes in this file**, only the names of env vars. Update the config with the
+user's OK when you learn a durable fact; don't edit the skill.
+
+### 3. Everything queryable: fetch live, don't cache
+
+Domains, servers, records, regions and flavors drift. Query them. A stale list is worse than none.
+
+## Bundled scripts (bash, curl, jq)
+
+`scripts/arvan-api.sh` is a thin wrapper that resolves and normalizes the key, passes it to curl
+through a private temp file (never argv or output), retries safely, and prints `HTTP <code>` plus
+a hint for known errors on stderr with the body on stdout.
 
 ```bash
-jq -r '.defaultRegion' ~/.config/arvan/config.json          # e.g. ir-thr-c2
-jq -r '.deployHooks["example.ir"]' ~/.config/arvan/config.json # cert-deploy target for a domain
+S="${CLAUDE_SKILL_DIR}/scripts/arvan-api.sh"
+"$S" auth:/v1/me | jq '.data.account'                         # which account is this key?
+"$S" "/cdn/4.0/domains?per_page=100"                          # any napi.arvancloud.ir path
+"$S" v3:ir-central1/servers                                   # https://ecc.ir-central1.arvanapis.ir/v3/servers
+"$S" storage:/v1/reports/storage                              # https://storage.arvanapis.ir/v1/...
+"$S" --dry-run -X POST -d '{"purge":"all"}' /cdn/4.0/domains/example.ir/caching/purge
+"$S" --allow-write -X POST -d '{"purge":"all"}' /cdn/4.0/domains/example.ir/caching/purge   # only after an explicit yes
 ```
 
-Schema (see `assets/config.example.json` for a filled-out placeholder):
-- `apiKeyEnv` — name of the env var holding the key. Defaults to `ARVAN_KEY` only as an initial guess; once the agent has confirmed the real name with the user (see §1), it overwrites this field so future conversations don't have to ask again.
-- `acmeTokenEnv` — env var acme.sh's `dns_arvan` plugin reads (default `Arvan_Token`).
-- `baseUrl` — optional override for the unified API host; default `https://napi.arvancloud.ir`.
-- `defaultRegion` — IaaS region to use when the user doesn't specify one.
-- `timeoutSeconds`, `maxRetries`, `backoffFactor` — optional knobs for scripts that make repeated API calls. Retry only transient network errors, `429`, and `5xx`.
-- `s3AccessKeyEnv`, `s3SecretKeyEnv`, `s3Region`, `s3Endpoint` — optional Object Storage settings. S3 uses separate credentials, not the machine-user API key.
-- `deployHooks` — map of `domain → { sshHost, certDirs[], reloadCmd }`, used to wire `acme.sh --install-cert` after cert renewal (see `references/dns-and-tls.md`).
-- `notes` — map of `domain → freeform note` for per-domain quirks worth remembering.
+Exit codes: `0` success (2xx), `1` HTTP or network error (redirects are reported, never followed), `2` usage, `3` key env var unset,
+`4` write refused (any method other than GET/HEAD needs `--allow-write`). The key is only ever sent over
+https to `*.arvancloud.ir` and `*.arvanapis.ir`; `--dry-run -d @file` prints the file's contents. Set `ARVAN_KEY_ENV=OTHER_VAR` to use a
+different account's key for one call.
 
-The **secret never goes in this file** — only the *name* of the env var that holds it. When you learn a new durable fact (a new deploy target, a domain quirk), update this config with the user's OK; don't edit the skill.
+`scripts/arvan-inventory.sh` prints a read-only snapshot of one account: identity, servers in
+every region, backups, CDN domains (all pages), Object Storage usage and buckets, Edge Computing
+and VOD counts. Use it when the user asks "what do I have on ArvanCloud?".
 
-### 3. Everything queryable → fetch live, don't cache
+## Product map (verified 2026-09-13)
 
-The list of domains, servers, records, flavors, etc. is authoritative from the API and drifts over time, so always query it (`GET /domains`, `GET /servers`, …) rather than relying on a stored copy. A stale cached list is worse than no list — a domain can read `active` in the panel yet be unpublished on public DNS.
+| Product | Live base URL | OpenAPI spec (`https://www.arvancloud.ir/api-docs/...`) | Live check |
+|---|---|---|---|
+| CDN / DNS / Security 4.0 | `https://napi.arvancloud.ir/cdn/4.0` | `cdn-4.0.yml` | 200 |
+| Cloud Server **v3** (preferred) | `https://ecc.{region}.arvanapis.ir/v3` | `iaas-3.0.0.yaml` | 200 |
+| Cloud Server v1 (legacy, widest) | `https://napi.arvancloud.ir/ecc/v1` | `iaas-1.0.json` | 200 |
+| Cloud Server v2 (backups, volume list) | `https://napi.arvancloud.ir/ecc/v2` | none (official CLI source) | 200 |
+| Account identity | `https://dejban.arvancloud.ir/v1/me` | none (official CLI source) | 200 |
+| Object Storage management | `https://storage.arvanapis.ir/v1` (plain `http` redirects) | `storage-1.0.0.yaml` | 200 |
+| Object Storage S3 | `https://s3.ir-thr-at1.arvanstorage.ir`, `https://s3.ir-tbz-sh1.arvanstorage.ir`, `https://hot.ir-central1.arvanstorage.ir` | described in `storage-1.0.0.yaml` | not tested (S3 keys) |
+| Edge Computing | `https://napi.arvancloud.ir/edge-computing/v1` | `ec-1.0.yaml` | 200 |
+| Cloud Container (CaaS) | `https://napi.arvancloud.ir/caas/v2/zones/{ir-thr-ba1 or ir-tbz-sh1}` | `paas-1.25.json` | 428 without a namespace |
+| VOD 2.0 | `https://napi.arvancloud.ir/vod/2.0` | `vod-2.0.json` | 200 |
+| Live Streaming 2.0 | `https://napi.arvancloud.ir/live/2.0` | `live-2.0.json` | 404 until a Live domain exists |
+| Video Ads 2.0 | `https://napi.arvancloud.ir/vads/2.0` | `vads-2.0.json` | 200 (`/channels`) |
+| AIaaS | none | `aiaas-1.0.yaml` returns an HTML page, not a spec | none |
 
-## Product map — base URLs and specs
-
-Each product has a live base URL (for real calls) and an OpenAPI spec (for looking up endpoints). Fetch specs **directly** — the ReDoc docs pages at `arvancloud.ir/api/{product}/{version}` are just a viewer and often time out.
-
-| Product | Live base URL | OpenAPI spec |
-|---|---|---|
-| CDN / DNS / Security 4.0 | `https://napi.arvancloud.ir/cdn/4.0` | `https://www.arvancloud.ir/api-docs/cdn-4.0.yml` |
-| Cloud Server / IaaS **3.0.0** *(preferred)* | `https://ecc.{region}.arvancloudapis.ir/v3` | `https://www.arvancloud.ir/api-docs/iaas-3.0.0.yaml` |
-| Cloud Server / IaaS 1.0 *(legacy)* | `https://napi.arvancloud.ir/ecc/v1` | `https://www.arvancloud.ir/api-docs/iaas-1.0.json` |
-| Edge Computing 1.0 | `https://napi.arvancloud.ir/edge-computing/v1` | `https://www.arvancloud.ir/api-docs/ec-1.0.yaml` |
-| Object Storage 1.0.0 | `http://storage.arvanapis.ir` (mgmt) / `https://s3.{region}.arvanstorage.ir` (S3) | `https://www.arvancloud.ir/api-docs/storage-1.0.0.yaml` |
-| Cloud Container / CaaS 1.25 | `https://napi.arvancloud.ir/caas/v2/zones/{zone}` | `https://www.arvancloud.ir/api-docs/paas-1.25.json` |
-| Video Platform / VOD 2.0 | `https://napi.arvancloud.ir/vod/2.0` | `https://www.arvancloud.ir/api-docs/vod-2.0.json` |
-| Live Streaming 2.0 | `https://napi.arvancloud.ir/live/2.0` | `https://www.arvancloud.ir/api-docs/live-2.0.json` |
-| Video Ads 2.0 | `https://napi.arvancloud.ir/vads/2.0` | `https://www.arvancloud.ir/api-docs/vads-2.0.json` |
-| AIaaS 1.0 | — | *(spec unavailable — returns a waiting page)* |
-
-`arvancloud-mcp` is a useful comparison project for broader product coverage, but it has a few endpoint mistakes. Read `references/mcp-cross-check.md` before adopting MCP routes, especially for Live, IaaS quota, CDN DNSSEC, and cache purge.
-
-Spec extension matters: `cdn-4.0.yml`, `iaas-3.0.0.yaml`, `iaas-1.0.json`, etc. Download all available specs at once when you need to look endpoints up offline:
+Fetch specs directly; the ReDoc pages at `arvancloud.ir/api/{product}/{version}` often time out:
 
 ```bash
 mkdir -p ~/Downloads/arvancloud-api-specs
-for spec in cdn-4.0.yml iaas-1.0.json iaas-3.0.0.yaml ec-1.0.yaml \
-            storage-1.0.0.yaml paas-1.25.json vod-2.0.json live-2.0.json vads-2.0.json; do
+for spec in cdn-4.0.yml iaas-3.0.0.yaml iaas-1.0.json ec-1.0.yaml storage-1.0.0.yaml \
+            paas-1.25.json vod-2.0.json live-2.0.json vads-2.0.json; do
   curl -sL "https://www.arvancloud.ir/api-docs/$spec" -o "$HOME/Downloads/arvancloud-api-specs/$spec"
 done
 ```
 
-**Human-oriented guides** (curl samples, IAM setup, account/panel) live on the Docusaurus site `docs.arvancloud.ir` — use it alongside the OpenAPI specs. It sits behind Arvan CDN cookies, so a bare `curl -L` loops on 307. Seed cookies first:
+Size for scoping (paths / operations): CDN 156/238, IaaS v3 39/45, IaaS v1 114/136, Edge 18/25,
+Object Storage 34/58, CaaS 134/299, VOD 30/54, Live 29/36, Video Ads 15/29.
+
+**Human guides** live on `docs.arvancloud.ir`, which sits behind Arvan CDN cookies (a bare
+`curl -L` loops on 307). Seed cookies first:
 
 ```bash
-COOKIES=/tmp/arvan-docs-cookies.txt
-curl -s -A "Mozilla/5.0" -c "$COOKIES" \
-  "https://docs.arvancloud.ir/fa/developer-tools/api/api-usage" -o /dev/null
-curl -sL -A "Mozilla/5.0" -b "$COOKIES" --max-redirs 3 \
-  "https://docs.arvancloud.ir/fa/developer-tools/api/api-usage"
+COOKIES="$(mktemp)"
+curl -s -A "Mozilla/5.0" -c "$COOKIES" "https://docs.arvancloud.ir/fa/developer-tools/api/api-usage" -o /dev/null
+curl -sL -A "Mozilla/5.0" -b "$COOKIES" --max-redirs 5 "https://docs.arvancloud.ir/fa/developer-tools/api/api-usage"
 ```
 
-### Endpoint counts per product (for scoping)
+## Regions and availability zones (live)
 
-| Product | Paths | Areas |
-|---|---|---|
-| CDN 4.0 | 156 | Acceleration, Firewall/WAF, DDoS, DNS Management, Domain, Caching, Page Rule, Rate Limiting, SSL/TLS, Load Balancing, Reports, … |
-| IaaS 3.0.0 | 39 | Availability Zones, Servers, Flavors, Images, Networks, Firewalls, Volumes |
-| IaaS 1.0 (legacy) | 113 | FloatingIPs, Images, Networks, Plans, Quota, Servers, Snapshots, Volumes, … |
-| Edge Computing | 16 | Deployments, Edge Compute, Namespace, Plans, Routes, Templates |
-| Object Storage | 25 | Buckets, Clusters, Stats, Users, Replications, … |
-| CaaS (PaaS) | 134 | Kubernetes API (core, apps, batch, networking, rbac, …) |
-| VOD | 31 | Videos, Channels, Analytics, Subtitles, Watermarks, … |
-| Live | 15 | Streams, Analytics, Watermarks, Reports, Custom domain |
-| Video Ads | 16 | Campaigns, Ads, Categories, Channels, Reports |
+| v3 region host | AZ codes (v1/v2 paths, v3 `availabilityZone`) |
+|---|---|
+| `ir-central1` | `ir-thr-ba1` (Bamdad), `ir-thr-fr1` (Foroogh), `ir-thr-si1` (Simin), Tehran |
+| `ir-northwest1` | `ir-tbz-sh1` (Shahriar), Tabriz |
+| `eu-west1` | `eu-west1-a` (Goethe), Germany |
+| `ir-southwest1` | `ir-southwest1-a` (Qeysar), Ahwaz. v3 host fails TLS; use v1/v2 |
+
+v3 hosts take the **region**; v1/v2 paths take the **AZ code**. Each v3 host only lists its own
+region's resources. Re-check with `GET /v3/availability-zones` or `GET /ecc/v1/regions`.
 
 ## Auth by product
 
 | Products | Auth |
 |---|---|
-| CDN, IaaS, VOD, Live, Video Ads, Edge, CaaS | `Authorization: Apikey <uuid>` after normalizing the env var (IaaS 3.0 also accepts `Authorization: Bearer {token}`) |
-| Object Storage — S3 API | AWS SigV-style auth with a **separate** Access key + Secret key (not the machine-user API key). Common hosts: `s3.ir-thr-at1.arvanstorage.ir`, `s3.ir-tbz-sh1.arvanstorage.ir`. |
-| Object Storage — management API | `http://storage.arvanapis.ir` — check the OpenAPI spec for its auth scheme |
+| CDN, IaaS v1/v2/v3, Object Storage management, Edge, CaaS, VOD, Live, Video Ads, dejban | `Authorization: Apikey <uuid>`. The prefix is case-insensitive (the v3 docs write `apikey`). The v3 and CDN specs also accept `Bearer <jwt>` panel tokens. |
+| Object Storage S3 API | AWS-style signatures with a **separate** access key and secret key from the panel, not the machine-user key. |
+| Edge `GET /templates` | no auth needed (**live**) |
 
-## Quick starts (most common tasks)
+## Errors you will see (live)
 
-```bash
-VAR_NAME="${CONFIRMED_VAR_NAME:-ARVAN_KEY}"
-RAW_KEY="${!VAR_NAME}"
-TOKEN="${RAW_KEY#apikey }"; TOKEN="${TOKEN#Apikey }"
-AUTH_HEADER="Apikey $TOKEN"
-
-# CDN — list all domains on the account
-curl -s -H "Authorization: $AUTH_HEADER" "https://napi.arvancloud.ir/cdn/4.0/domains?per_page=100"
-
-# IaaS 3.0 — list servers in a region (region goes in the HOSTNAME)
-REGION=ir-thr-c2
-curl -s -H "Authorization: $AUTH_HEADER" "https://ecc.${REGION}.arvancloudapis.ir/v3/servers"
-
-# VOD — list channels
-curl -s -H "Authorization: $AUTH_HEADER" "https://napi.arvancloud.ir/vod/2.0/channels"
-```
+| Status | Body | Meaning |
+|---|---|---|
+| 401 | `{"message":"Unauthenticated."}` (CDN, VOD), empty (IaaS v1), `{"code":3 or 4,"message":"invalid credentials"}` (IaaS v2), `{"message":"Unauthorized"}` (Edge), `Unauthorized` text (Live) | key missing, wrong or revoked |
+| 403 | `{"message":"Account requires info completion"}` | account profile/KYC incomplete. Blocks IaaS; CDN, Storage and Edge still work. Route is valid. |
+| 403 | `{"message":"Upgrade plan"}` | feature needs a higher plan (e.g. Object Storage replications and access points) |
+| 403 | anything else | check the machine user's IAM access rules for that product |
+| 409 | `{"message":"bucket deletion is already in progress"}` | Object Storage bucket is being deleted |
+| 404 | `{"message":"Domain not found."}` on Live | create the Live product domain first (`/live/2.0/domain`) |
+| 404 | HTML error page or `{"message":"Not Found"}` | wrong path (e.g. v3 `/security-groups`, v1 `/details`) |
+| 405 | `{"required_plan":3, ...}` | CDN feature gated by plan (e.g. DNS export needs Professional) |
+| 420 | none | IaaS quota reached |
+| 428 | `{"message":"no namespace is found"}` | Cloud Container has no namespace in that zone |
+| curl 60 | certificate mismatch on `ecc.*.arvanapis.ir` | v3 host built from an AZ code or unknown region |
 
 ## Where to go next
 
-- **DNS records (list/create/update/delete) and TLS/Let's Encrypt wildcard certs via acme.sh** → read `references/dns-and-tls.md`. This is the most operationally detailed area (typed `value` objects, `_acme-challenge`, `dns_arvan`, cert deploy hooks).
-- **Cloud Server / IaaS** (create servers, 3.0 vs 1.0 differences, required body fields) → read `references/iaas.md`.
-- **MCP comparison / wider service catalog** (Object Storage, VOD/Live, CDN apps, rate limits, metric exporters, guardrails) → read `references/mcp-cross-check.md`.
-- **Account balance / wallet / quota** → there is **no wallet or billing API** in any published spec; balance is panel-only (npanel → dashboard → Wallet tab / کیف پول). The closest API endpoints (usage stats, quota limits) are listed in `references/iaas.md`.
+- **DNS records, domains, cache purge, CDN settings, Let's Encrypt via acme.sh** -> `references/dns-and-tls.md`.
+- **Cloud Server** (v3 vs v1 vs v2, regions, create body, backups, quota, usage) -> `references/iaas.md`.
+- **Object Storage** (management API, S3 endpoints, usage reports) -> `references/object-storage.md`.
+- **Edge Computing, Live, VOD, Cloud Container, Video Ads** -> `references/products.md`.
+- **Corrections to `arvancloud-mcp` and to earlier versions of this skill** -> `references/mcp-cross-check.md`.
+- **Wallet balance**: no published spec has a wallet or balance endpoint; it is panel-only. The
+  closest API data (quota, CDN plan `needed_balance`, storage usage) is listed in `references/iaas.md`.
 
 ## Safety guardrails
 
-Before destructive or billable operations, summarize the target account/resource, HTTP method/path, and request body, then ask for confirmation unless the user already gave explicit approval in this turn. This applies to DNS create/update/delete, domain add/delete, cache purge, CDN/WAF/rate-limit changes, server create/delete/actions, volume/network/floating-IP changes, Object Storage writes/deletes, certificate install hooks, SSH commands, Terraform/Kubernetes applies, and recurring/background jobs.
+Before destructive or billable operations, show the target **account** (from `/v1/me`), the HTTP
+method, URL and body (`arvan-api.sh --dry-run`), and ask for confirmation unless the user already
+approved that exact action in this turn. This covers DNS create/update/delete, domain add/delete,
+cache purge, CDN/WAF/rate-limit changes, server create/delete/actions, volume/network/floating-IP
+changes, backups, Object Storage writes/deletes, certificate install hooks, SSH commands and
+recurring jobs. `arvan-api.sh` enforces this by refusing non-GET methods without `--allow-write`.
 
-For read-only inventory requests, use `GET` endpoints freely but keep outputs scoped and avoid printing secrets or full access tokens.
+For read-only requests use GET freely, keep output scoped, and never print keys.
 
 ## Gotchas that bite everyone
 
-- The word `Apikey` **and** the trailing space are both required in the auth header. Normalize copied `apikey ...` or bare UUID values to `Authorization: Apikey <uuid>`.
-- A domain can show `status: active` in the panel yet **not actually be published** by Arvan's authoritative nameservers. Always confirm real resolution (`dig SOA <domain> @8.8.8.8`) before attempting DNS-01 cert issuance.
-- Iran's DNS filtering returns forged IPs `10.10.34.34/.35/.36` — **not** empty responses. An empty SOA/NS/A means a delegation/publishing problem, not censorship.
-- Fetch OpenAPI specs from `/api-docs/…`; don't scrape the ReDoc HTML pages (they time out).
-- Don't assume the API key lives in `$ARVAN_KEY`. Check `apiKeyEnv` in the config first, ask the user if it's still unresolved, and persist the confirmed name back to the config — see "Credentials" above.
-- Do not copy `arvancloud-mcp` routes blindly. During comparison, Live `/channels`, IaaS `/quotas`, CDN `/dnssec`, and CDN cache purge path needed correction against specs/runtime.
+- The v3 host is `ecc.{region}.arvanapis.ir` with a **region** (`ir-central1`). AZ codes as
+  hostnames fail TLS, `arvancloudapis.ir` does not resolve, and `*.arvanapis.ir` has wildcard DNS
+  so resolving proves nothing.
+- v3 lists are per region. An empty `/servers` on one host does not mean the account has no servers.
+- v3 `GET /security-groups` is in the spec but 404s; use `/firewalls`. v3 has no SSH key, snapshot,
+  backup or quota paths; use v1 or v2.
+- IaaS v1 quota is singular `/regions/{az}/quota`; there is no `/ecc/v1/details`, no `GET .../subnets`
+  list and no `GET .../ptr`.
+- DNS `value` shapes differ by type: `a`/`aaaa` are arrays, `aname` uses `location`, `srv` uses
+  `target`, and `mx` is a single object. Send lowercase `type`.
+- Cache purge is `POST /domains/{domain}/caching/purge` with `{"purge":"all"}`, not `DELETE .../purge`.
+- A domain can be `status: active` yet not published by Arvan's nameservers. Compare `ns_keys` with
+  `current_ns` and run `dig SOA <domain> @8.8.8.8` before DNS-01.
+- Iran's DNS filtering returns forged IPs `10.10.34.34/.35/.36`, not empty responses. An empty
+  SOA/NS means a delegation problem, not censorship.
+- Object Storage management is `https://storage.arvanapis.ir/v1/...`; usage is `/v1/reports/storage`
+  (there is no `/v1/stats/...`).
+- `403 Account requires info completion` is an account state, not a wrong route or a bad key.
+- Don't assume the key lives in `$ARVAN_KEY`; resolve `apiKeyEnv` first.

@@ -1,6 +1,6 @@
 {
   "name": "arvancloud-api-skill",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Unofficial Agent Skill for ArvanCloud APIs and Let's Encrypt DNS-01 via acme.sh dns_arvan.",
   "keywords": [
     "agent-skill",
