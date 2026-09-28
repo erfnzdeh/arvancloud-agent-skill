@@ -19,7 +19,7 @@ Keep three things separate: the **secret** (API key) lives in an environment var
 **per-user state** (default region, cert-deploy hooks, notes) lives in a config file outside the
 skill, and anything the API can tell you (domains, servers, regions) is **fetched live**.
 
-### 1. Credentials: environment variable, never a file in the skill
+### 1. Credentials: the plugin's settings or an environment variable, never a file in the skill
 
 Every product except the Object Storage S3 API authenticates with a **machine-user API key**:
 
@@ -27,7 +27,9 @@ Every product except the Object Storage S3 API authenticates with a **machine-us
 Authorization: Apikey <uuid>
 ```
 
-**`ARVAN_KEY` is only the default name. Don't assume that's what it's called.** Resolve the real env var every session:
+**In Claude Code with this plugin installed, use the key from the plugin's settings.** When the user has saved a key there (`/plugin configure arvancloud-api@arvancloud-agent-skill`), it arrives as `$CLAUDE_PLUGIN_OPTION_API_KEY`. If that is set, use it (`CONFIRMED_VAR_NAME=CLAUDE_PLUGIN_OPTION_API_KEY`) and skip the steps below; the bundled scripts pick it up on their own. If it is empty, suggest saving the key in the plugin's settings, since it is then kept in the system credential store, or fall back to an environment variable.
+
+**Everywhere else (Cursor, skills.sh, a manual clone), the key is in an environment variable, and `ARVAN_KEY` is only the default name. Don't assume that's what it's called.** Resolve the real env var every session:
 
 1. If `~/.config/arvan/config.json` exists, read `apiKeyEnv` from it and check that the named
    var is set (`printenv "$(jq -r .apiKeyEnv ~/.config/arvan/config.json)" >/dev/null`).
@@ -105,7 +107,7 @@ S="${CLAUDE_SKILL_DIR}/scripts/arvan-api.sh"
 
 Exit codes: `0` success (2xx), `1` HTTP or network error (redirects are reported, never followed), `2` usage, `3` key env var unset,
 `4` write refused (any method other than GET/HEAD needs `--allow-write`). The key is only ever sent over
-https to `*.arvancloud.ir` and `*.arvanapis.ir`; `--dry-run -d @file` prints the file's contents. Set `ARVAN_KEY_ENV=OTHER_VAR` to use a
+https to `*.arvancloud.ir` and `*.arvanapis.ir`; `--dry-run -d @file` prints the file's contents. The scripts use the plugin's saved key when there is one. Set `ARVAN_KEY_ENV=OTHER_VAR` to use a
 different account's key for one call.
 
 `scripts/arvan-inventory.sh` prints a read-only snapshot of one account: identity, servers in
@@ -229,4 +231,4 @@ For read-only requests use GET freely, keep output scoped, and never print keys.
 - Object Storage management is `https://storage.arvanapis.ir/v1/...`; usage is `/v1/reports/storage`
   (there is no `/v1/stats/...`).
 - `403 Account requires info completion` is an account state, not a wrong route or a bad key.
-- Don't assume the key lives in `$ARVAN_KEY`; resolve `apiKeyEnv` first.
+- Don't assume the key lives in `$ARVAN_KEY`. Use `$CLAUDE_PLUGIN_OPTION_API_KEY` when the plugin provides it, otherwise resolve `apiKeyEnv` first.

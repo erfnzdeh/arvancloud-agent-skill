@@ -64,7 +64,7 @@ Project-specific clones work the same way under `.claude/skills/` or `.cursor/sk
 
 ## Setup
 
-No credentials live in this repo. The skill reads an API key from an environment variable at runtime (default name `$ARVAN_KEY`: confirm the real name; see Setup in [`skills/arvancloud-api/SKILL.md`](skills/arvancloud-api/SKILL.md)). Per-user state (region, cert-deploy hooks) belongs in `~/.config/arvan/config.json`.
+No credentials live in this repo. In Claude Code, save your API key in the plugin's settings (`/plugin configure arvancloud-api@arvancloud-agent-skill`): it is kept in your system's credential store and handed to Claude's shell at the start of each session by a small hook (`hooks/export-plugin-key.sh`). Everywhere else, the skill reads the key from an environment variable at runtime (default name `$ARVAN_KEY`: confirm the real name; see Setup in [`skills/arvancloud-api/SKILL.md`](skills/arvancloud-api/SKILL.md)). Per-user state (region, cert-deploy hooks) belongs in `~/.config/arvan/config.json`.
 
 ## What it covers
 

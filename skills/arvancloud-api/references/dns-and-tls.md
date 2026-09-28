@@ -146,7 +146,7 @@ export Arvan_Token="Apikey XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"   # same machin
 ### Issue a root + wildcard cert
 
 ```bash
-VAR_NAME="${CONFIRMED_VAR_NAME:-ARVAN_KEY}"
+VAR_NAME="${CONFIRMED_VAR_NAME:-ARVAN_KEY}"   # CLAUDE_PLUGIN_OPTION_API_KEY when the plugin provides the key
 RAW_KEY="${!VAR_NAME}"
 TOKEN="${RAW_KEY#apikey }"; TOKEN="${TOKEN#Apikey }"
 export Arvan_Token="Apikey $TOKEN"

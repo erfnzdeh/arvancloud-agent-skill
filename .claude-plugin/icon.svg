@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>arvancloud-api</title>
+  <rect width="512" height="512" rx="112" fill="#12324f"/>
+  <path d="M154 356h212c42 0 76-32 76-72 0-38-30-69-68-72-9-54-56-94-112-94-45 0-85 26-103 65-47 3-83 40-83 86 0 48 35 87 78 87z" fill="#eef6ff"/>
+  <path d="M190 236l52 40-52 40" fill="none" stroke="#12324f" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M268 320h72" fill="none" stroke="#12324f" stroke-width="26" stroke-linecap="round"/>
+</svg>
