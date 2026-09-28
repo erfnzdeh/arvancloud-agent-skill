@@ -15,7 +15,8 @@ Targets:
   auth:/v1/me                https://dejban.arvancloud.ir/v1/me
   https://...                full URL; only https on *.arvancloud.ir or *.arvanapis.ir
 
-Key: taken from the env var named by $ARVAN_KEY_ENV, else "apiKeyEnv" in
+Key: taken from the env var named by $ARVAN_KEY_ENV, else the key saved in the
+Claude Code plugin's settings ($CLAUDE_PLUGIN_OPTION_API_KEY), else "apiKeyEnv" in
 ~/.config/arvan/config.json, else $ARVAN_KEY. A bare UUID or an "apikey <uuid>"
 value (any case) is normalized to "Authorization: Apikey <uuid>".
 
@@ -96,6 +97,8 @@ if [ "$is_write" = 1 ] && [ "$allow_write" != 1 ]; then
 fi
 
 var="${ARVAN_KEY_ENV:-}"
+# The key saved in the Claude Code plugin's settings, exported by its SessionStart hook.
+if [ -z "$var" ] && [ -n "${CLAUDE_PLUGIN_OPTION_API_KEY:-}" ]; then var=CLAUDE_PLUGIN_OPTION_API_KEY; fi
 [ -n "$var" ] || var="$(cfg_get .apiKeyEnv)"
 var="${var:-ARVAN_KEY}"
 case "$var" in ''|[0-9]*|*[!A-Za-z0-9_]*) echo "arvan-api: invalid env var name '$var'" >&2; exit 2 ;; esac
